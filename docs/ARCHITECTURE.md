@@ -17,7 +17,7 @@ Fonts (Montserrat, Open Sans) come from the `@fontsource` npm packages, imported
 - **State.** One React state store holds invoices, refunds and the audit log, seeded from `buildSeed()`. Signed-in user is plain React state. Refreshing the page resets everything, including the login.
 - **Auth.** `accounts` in `src/data.ts` holds demo emails and passwords in plain text, and the login form compares them in the browser. This is a stand-in, not security.
 - **Money.** Amounts are integers in pesewas (1 GHS = 100) and formatted for display.
-- **Data model.** `Invoice` (id, company, order, customer, lines, net, tax, total, status, timestamps, cancel reason, flagged, created by), `Refund` (credit note linked to an invoice, amount, tax portion, reason, time), `Audit` entries, `Account` and `Company`.
+- **Data model.** `Invoice` (id, company, order, customer, lines, rate set, net, tax, total, status, timestamps, cancel reason, flagged, created by), `Refund` (credit note linked to an invoice, amount, tax portion, reason, time), `Audit` entries, `Account` and `Company`.
 - **Derived status.** An invoice is stored as Pending, Certified or Cancelled. "Part refunded" and "Refunded" are computed from its credit notes.
 
 ## What a real system needs
