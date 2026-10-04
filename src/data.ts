@@ -2,12 +2,22 @@ export type Role = 'GRA Admin' | 'Owner' | 'Manager' | 'Cashier' | 'Auditor';
 export interface Company { id: string; name: string; tin: string; sector: string; code: string }
 export interface Line { name: string; qty: number; unit: number }
 export type Status = 'Pending' | 'Certified' | 'Cancelled';
-export interface Invoice { id: string; companyId: string; order: string; customer: string; lines: Line[]; net: number; tax: number; total: number; status: Status; createdAt: string; certifiedAt?: string; cancelledAt?: string; cancelReason?: string; flagged?: boolean; by: string }
+export type RateMode = 'ghana' | 'demo';
+export interface Invoice { mode?: RateMode; id: string; companyId: string; order: string; customer: string; lines: Line[]; net: number; tax: number; total: number; status: Status; createdAt: string; certifiedAt?: string; cancelledAt?: string; cancelReason?: string; flagged?: boolean; by: string }
 export interface Refund { id: string; invoiceId: string; companyId: string; amount: number; tax: number; reason: string; at: string; by: string }
 export interface Audit { at: string; actor: string; role: Role; companyId: string; action: string; target: string }
 export interface Account { email: string; password: string; name: string; role: Role; companyId?: string; portal: 'admin' | 'business' }
 
-export const RATE = 10;
+export interface TaxPart { name: string; pct: number }
+export const RATE_MODES: Record<RateMode, { label: string; short: string; note: string; parts: TaxPart[] }> = {
+  ghana: { label: 'Ghana 2026 rates (VAT 15% + NHIL 2.5% + GETFund 2.5%)', short: 'Ghana 2026 rates', note: 'Modelled on the rates GRA publishes for the 2026 VAT reforms (Act 1151). All three are charged on the same base, 20% in total, no COVID-19 levy. Check gra.gov.gh for the current position.', parts: [{ name: 'VAT', pct: 15 }, { name: 'NHIL', pct: 2.5 }, { name: 'GETFund Levy', pct: 2.5 }] },
+  demo: { label: 'Demo flat 10% (illustrative only)', short: 'Demo 10%', note: 'An illustrative flat 10% that matches no real tax.', parts: [{ name: 'Demo VAT', pct: 10 }] },
+};
+export const modeOf = (inv: { mode?: RateMode }): RateMode => inv.mode ?? 'demo';
+export const totalPct = (m: RateMode) => RATE_MODES[m].parts.reduce((s, p) => s + p.pct, 0);
+/** Tax added on a net amount (cents). Each part is rounded on its own; the total is their sum. */
+export const taxParts = (net: number, m: RateMode) => RATE_MODES[m].parts.map((p) => ({ name: p.name, pct: p.pct, amount: Math.round((net * p.pct) / 100) }));
+export const taxFor = (net: number, m: RateMode) => taxParts(net, m).reduce((s, p) => s + p.amount, 0);
 export const NOW = '2026-10-04T01:00:00.000Z';
 export const ADMIN_BASE = '/gra-admin-7q4k';
 export const BIZ_BASE = '/app';
@@ -31,7 +41,8 @@ export const money = (n: number) => 'GHS ' + (n / 100).toLocaleString('en-GH', {
 export const stamp = (s?: string) => (s ? s.replace('T', ' ').slice(0, 19) + ' UTC' : 'Not yet');
 export const day = (s: string) => s.slice(0, 10);
 export const monthLabel = (m: string) => new Date(m + '-01T00:00:00Z').toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-export const taxOf = (gross: number) => Math.round((gross * RATE) / (100 + RATE));
+/** Tax contained in a tax-inclusive amount (used for refunds and credit notes). */
+export const taxOf = (gross: number, m: RateMode) => { const t = totalPct(m); return Math.round((gross * t) / (100 + t)); };
 export const fingerprint = (s: string) => {
   let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
   for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
@@ -69,18 +80,18 @@ export function buildSeed() {
         const nl = 1 + Math.floor(r() * 2);
         const lines: Line[] = Array.from({ length: nl }, () => { const [name, unit] = catalog[c.id][Math.floor(r() * 6)]; return { name, qty: 1 + Math.floor(r() * (unit > 50000 ? 2 : 4)), unit }; });
         const net = lines.reduce((s, l) => s + l.qty * l.unit, 0);
-        const tax = Math.round((net * RATE) / 100);
+        const tax = taxFor(net, 'ghana');
         const id = `INV-${c.code}-${pad(n, 4)}`;
         const created = iso(when);
         const roll = r();
         const recent = created > '2026-10-03T12:00:00';
-        const inv: Invoice = { id, companyId: c.id, order: `ORD-${c.code}-${pad(n * 7 % 9000 + 100, 4)}`, customer: customers[Math.floor(r() * customers.length)], lines, net, tax, total: net + tax, status: 'Certified', createdAt: created, certifiedAt: iso(new Date(when.getTime() + 2000 + Math.floor(r() * 4000))), by: staff[c.id][Math.floor(r() * staff[c.id].length)] };
+        const inv: Invoice = { mode: 'ghana', id, companyId: c.id, order: `ORD-${c.code}-${pad(n * 7 % 9000 + 100, 4)}`, customer: customers[Math.floor(r() * customers.length)], lines, net, tax, total: net + tax, status: 'Certified', createdAt: created, certifiedAt: iso(new Date(when.getTime() + 2000 + Math.floor(r() * 4000))), by: staff[c.id][Math.floor(r() * staff[c.id].length)] };
         if (recent && roll < 0.35) { inv.status = 'Pending'; delete inv.certifiedAt; }
         else if (roll < 0.09) { inv.status = 'Cancelled'; inv.cancelledAt = iso(new Date(when.getTime() + 3600000 * (1 + Math.floor(r() * 5)))); inv.cancelReason = cancelReasons[Math.floor(r() * cancelReasons.length)]; delete inv.certifiedAt; }
         else if (roll < 0.22 && !recent) {
           const full = r() < 0.4; const gross = full ? inv.total : Math.round(inv.total * (0.2 + r() * 0.4) / 100) * 100;
           const at = iso(new Date(when.getTime() + 86400000 * (1 + Math.floor(r() * 3))));
-          if (at <= NOW) refunds.push({ id: `CN-${c.code}-${pad(refunds.filter((x) => x.companyId === c.id).length + 1, 4)}`, invoiceId: id, companyId: c.id, amount: gross, tax: taxOf(gross), reason: refundReasons[Math.floor(r() * refundReasons.length)], at, by: c.id === 'ak' ? 'manager@akwaaba.demo' : staff[c.id][0] });
+          if (at <= NOW) refunds.push({ id: `CN-${c.code}-${pad(refunds.filter((x) => x.companyId === c.id).length + 1, 4)}`, invoiceId: id, companyId: c.id, amount: gross, tax: taxOf(gross, 'ghana'), reason: refundReasons[Math.floor(r() * refundReasons.length)], at, by: c.id === 'ak' ? 'manager@akwaaba.demo' : staff[c.id][0] });
         }
         if (id === 'INV-OS-0009' || id === 'INV-CR-0003') inv.flagged = false;
         invoices.push(inv);
