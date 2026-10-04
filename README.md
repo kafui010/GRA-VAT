@@ -2,7 +2,7 @@
 
 A front-end **simulator** of an E-VAT invoicing platform with a separate admin portal for tax-authority staff. Businesses issue invoices that get a timestamp and a QR code. Admin staff can see every company, invoice, cancellation and refund, and total what each company owes in VAT.
 
-> **This is a demo.** It is not affiliated with, endorsed by or verified by the Ghana Revenue Authority (GRA). Logins are fake and checked in the browser. There is no backend and nothing is secure. The 10% tax rate is illustrative, not Ghana law. QR codes open this app's own demo verify page. State resets on every page refresh. Do not enter real credentials or real data.
+> **This is a demo.** It is not affiliated with, endorsed by or verified by the Ghana Revenue Authority (GRA). Logins are fake and checked in the browser. There is no backend and nothing is secure. Tax figures are a simulation: new and seeded invoices use the 2026 Ghana rates GRA publishes (VAT 15% + NHIL 2.5% + GETFund 2.5%, 20% in total, no COVID-19 levy), with an illustrative flat 10% as an option. Neither is a tax filing or advice. QR codes open this app's own demo verify page. State resets on every page refresh. Do not enter real credentials or real data.
 
 ## Run it
 
@@ -43,6 +43,18 @@ Sign-in is held in memory only. A page reload logs you out and resets all data, 
 - [docs/FEATURES_AND_ROLES.md](docs/FEATURES_AND_ROLES.md) pages and the role permission matrix
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) code layout, state, data model, what a real backend needs
 - [docs/LIMITATIONS_AND_SOURCES.md](docs/LIMITATIONS_AND_SOURCES.md) demo limits and what is verified or not
+
+## Screenshots
+
+Real screenshots of the running demo (all data is made up). More in [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
+
+![GRA admin overview](docs/images/01-admin-overview.png)
+
+![Invoice with tax breakdown and QR](docs/images/03-admin-invoice-with-qr.png)
+
+![Customer verify page](docs/images/07-customer-verify-page.png)
+
+![Phone layout](docs/images/08-phone-business-dashboard.png)
 
 ## Security notes for a public repo
 
