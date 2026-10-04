@@ -144,6 +144,7 @@ function Routed({ rel }: { rel: string }) {
   const { user } = useStore();
   const seg = rel.split('/').filter(Boolean); const top = seg[0] ?? '';
   if (!user) return null;
+  if (!['', 'companies', 'invoices', 'exceptions', 'refunds', 'reports', 'audit', 'new', 'team'].includes(top)) return <NotFound />;
   if (!ALLOWED[user.role].includes(top)) return <div className="wrap"><PageHead title="Not available for your role" icon="lock" sub={`${user.role} accounts cannot open this page.`} /><Link className="btn" to={(user.portal === 'admin' ? ADMIN_BASE : BIZ_BASE)}>Back to dashboard</Link></div>;
   const admin = user.role === 'GRA Admin';
   if (top === '') return <Dashboard />;
@@ -259,7 +260,7 @@ function Invoices({ presetCo, hideCo }: { presetCo?: string; hideCo?: boolean })
 function InvoicePage({ id }: { id: string }) {
   const s = useStore(); const { user, base } = s;
   const inv = s.invoices.find((i) => i.id === id);
-  const [reason, setReason] = useState(''); const [amt, setAmt] = useState(''); const [msg, setMsg] = useState('');
+  const [reason, setReason] = useState(''); const [rreason, setRreason] = useState(''); const [amt, setAmt] = useState(''); const [msg, setMsg] = useState('');
   if (!user) return null;
   if (!inv || (user.role !== 'GRA Admin' && inv.companyId !== user.companyId)) return <div className="wrap"><PageHead title="Invoice not found" icon="info" /><Link className="btn" to={base + '/invoices'}>Back to invoices</Link></div>;
   const rfs = s.refunds.filter((f) => f.invoiceId === inv.id);
@@ -268,10 +269,10 @@ function InvoicePage({ id }: { id: string }) {
   const cancel = () => { if (!reason.trim()) return setMsg('Add a cancellation reason first.'); s.patch(inv.id, (i) => ({ ...i, status: 'Cancelled', cancelledAt: new Date().toISOString(), cancelReason: reason.trim() })); s.log('Invoice cancelled', inv.id, inv.companyId); setMsg('Invoice cancelled.'); };
   const refund = () => {
     const g = Math.round(parseFloat(amt) * 100);
-    if (!g || g <= 0) return setMsg('Enter a refund amount.'); if (g > left) return setMsg(`Refund cannot exceed ${money(left)} still refundable.`); if (!reason.trim()) return setMsg('Add a refund reason.');
+    if (!g || g <= 0) return setMsg('Enter a refund amount.'); if (g > left) return setMsg(`Refund cannot exceed ${money(left)} still refundable.`); if (!rreason.trim()) return setMsg('Add a refund reason.');
     const n = s.refunds.filter((f) => f.companyId === inv.companyId).length + 1;
     const cn = `CN-${companies.find((c) => c.id === inv.companyId)!.code}-${String(n).padStart(4, '0')}`;
-    s.addRefund({ id: cn, invoiceId: inv.id, companyId: inv.companyId, amount: g, tax: taxOf(g), reason: reason.trim(), at: new Date().toISOString(), by: user.email }); s.log('Credit note issued', cn, inv.companyId); setAmt(''); setReason(''); setMsg(`Credit note ${cn} issued. The original invoice stays unchanged.`);
+    s.addRefund({ id: cn, invoiceId: inv.id, companyId: inv.companyId, amount: g, tax: taxOf(g), reason: rreason.trim(), at: new Date().toISOString(), by: user.email }); s.log('Credit note issued', cn, inv.companyId); setAmt(''); setRreason(''); setMsg(`Credit note ${cn} issued. The original invoice stays unchanged.`);
   };
   const flag = () => { s.patch(inv.id, (i) => ({ ...i, flagged: !i.flagged })); s.log(inv.flagged ? 'Flag removed' : 'Flagged for review', inv.id, inv.companyId); };
   const url = ROOT + '/verify/' + inv.id;
@@ -291,7 +292,7 @@ function InvoicePage({ id }: { id: string }) {
           <dl className="kv"><dt>Customer</dt><dd>{inv.customer}</dd><dt>Net</dt><dd>{money(inv.net)}</dd><dt>Demo VAT ({RATE}%)</dt><dd>{money(inv.tax)}</dd><dt>Total</dt><dd><b>{money(inv.total)}</b></dd><dt>Created by</dt><dd>{inv.by}</dd>{inv.cancelReason && <><dt>Cancel reason</dt><dd>{inv.cancelReason}</dd></>}</dl>
         </Card>
         <Card title="Verification QR" icon="qr">
-          <div className="qr-box"><QR url={url} /><div><p className="muted">Encodes the demo verification page for this invoice. It is a private File link, never a GRA address.</p><p className="mono">Demo fingerprint {fingerprint(inv.id + inv.total + (inv.certifiedAt || ''))}</p><Link className="btn ghost sm" to={'/verify/' + inv.id}>Open customer page<Icon name="arrow" size={16} /></Link></div></div>
+          <div className="qr-box"><QR url={url} /><div><p className="muted">Encodes the demo verification page for this invoice. It points at this app's own demo page, never a GRA address.</p><p className="mono">Demo fingerprint {fingerprint(inv.id + inv.total + (inv.certifiedAt || ''))}</p><Link className="btn ghost sm" to={'/verify/' + inv.id}>Open customer page<Icon name="arrow" size={16} /></Link></div></div>
         </Card>
       </div>
       <div className="grid g2">
@@ -306,7 +307,7 @@ function InvoicePage({ id }: { id: string }) {
           <div className="form">
             {inv.status === 'Pending' && can(user.role, 'certify') && <div className="row"><button className="btn" onClick={certify}><Icon name="check" size={16} />Certify invoice (demo)</button></div>}
             {inv.status !== 'Cancelled' && ((inv.status === 'Pending' && can(user.role, 'cancelPending')) || (inv.status === 'Certified' && can(user.role, 'cancel') && done === 0)) && <div className="row end"><label className="f grow"><span>Reason</span><input className="in" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Cancellation or refund reason" /></label><button className="btn danger" onClick={cancel}><Icon name="ban" size={16} />Cancel invoice</button></div>}
-            {inv.status === 'Certified' && can(user.role, 'refund') && left > 0 && <div className="row end"><label className="f"><span>Refund amount (GHS), max {(left / 100).toFixed(2)}</span><input className="in" inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="0.00" /></label><button className="btn" onClick={refund}><Icon name="undo" size={16} />Issue credit note</button></div>}
+            {inv.status === 'Certified' && can(user.role, 'refund') && left > 0 && <div className="row end"><label className="f grow"><span>Refund reason</span><input className="in" value={rreason} onChange={(e) => setRreason(e.target.value)} placeholder="Why is this being refunded?" /></label><label className="f"><span>Refund amount (GHS), max {(left / 100).toFixed(2)}</span><input className="in" inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="0.00" /></label><button className="btn" onClick={refund}><Icon name="undo" size={16} />Issue credit note</button></div>}
             {inv.status === 'Certified' && !can(user.role, 'refund') && <p className="muted">Cashiers cannot refund or cancel certified invoices. Ask a manager.</p>}
             {inv.status === 'Cancelled' && <p className="muted">This invoice is cancelled. No further actions.</p>}
           </div>
@@ -470,7 +471,7 @@ function Verify({ id }: { id: string }) {
         {!inv ? <Card title="No record found" icon="ban"><p className="muted">No invoice "{id}" exists in this demo session. New invoices only exist until you reload the page.</p><Link className="btn" to="/">Home</Link></Card> : (
           <Card title={inv.id} icon="receipt" aside={<Badge s={shownStatus(inv, refunds)} />}>
             <dl className="kv"><dt>Company</dt><dd>{cname(inv.companyId)}</dd><dt>Total</dt><dd><b>{money(inv.total)}</b></dd><dt>Demo VAT</dt><dd>{money(inv.tax)}</dd><dt>Created</dt><dd>{stamp(inv.createdAt)}</dd><dt>Demo certified</dt><dd>{stamp(inv.certifiedAt)}</dd>{inv.cancelledAt && <><dt>Cancelled</dt><dd>{stamp(inv.cancelledAt)}</dd></>}{refundedOf(inv, refunds) > 0 && <><dt>Refunded</dt><dd>{money(refundedOf(inv, refunds))}</dd></>}</dl>
-            <div className="qr-box"><QR url={ROOT + '/verify/' + inv.id} /><p className="muted">Demo QR. It opens this page in the private demo File, so only the owner can open it after signing in.</p></div>
+            <div className="qr-box"><QR url={ROOT + '/verify/' + inv.id} /><p className="muted">Demo QR. It opens this demo page on the same site. Demo invoices created in a session only exist until you reload.</p></div>
           </Card>)}
       </div>
     </div>

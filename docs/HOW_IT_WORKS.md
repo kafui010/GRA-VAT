@@ -7,7 +7,7 @@ All of this runs in the browser with seeded data. Terms: *company* is a business
 1. **Reserve.** A cashier, manager or owner creates an invoice with a customer, items, quantities and unit prices. The app adds the demo tax (10%) and gives the invoice an ID such as like `INV-AK-0001`. Status: **Pending**.
 2. **Certify (demo).** The invoice is marked **Certified** with a certification timestamp. In a real system this is where the tax authority would sign the invoice.
 3. **Cancel.** A pending invoice can be cancelled by cashier, manager or owner with a reason. A certified invoice that has no refunds can be cancelled by manager or owner. Status: **Cancelled**, with a cancel timestamp and reason. Cancelled invoices do not count as sales.
-4. **Refund.** Manager or owner issues a **credit note** against a certified invoice for a partial or full amount. The original invoice is never edited. The app blocks refunds above the remaining refundable amount. Displayed status becomes **Part refunded** or **Refunded**.
+4. **Refund.** Manager or owner issues a **credit note** against a certified invoice for a partial or full amount, with a reason. The original invoice is never edited. The app blocks refunds above the remaining refundable amount. Displayed status becomes **Part refunded** or **Refunded**.
 
 Every action adds a line to the audit log (who, role, action, target, time).
 

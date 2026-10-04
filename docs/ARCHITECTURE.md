@@ -10,9 +10,10 @@
       data.ts       types, demo accounts, seeded data, totals and status helpers
       style.css     layout and theme (admin theme is blue, business theme is green)
       qr/           MIT-licensed QR code algorithm
-      fonts/        Montserrat 700/900, Open Sans 400/600
 
-- **Routing.** The app reads the current path and chooses a portal: `/gra-admin-7q4k...` for admin, `/app...` for business, `/verify/...` for customers, otherwise public pages. There is no router config file. `App.tsx` switches on the path.
+Fonts (Montserrat, Open Sans) come from the `@fontsource` npm packages, imported in `main.tsx`.
+
+- **Routing.** The app reads the current path and chooses a portal: `/gra-admin-7q4k...` for admin, `/app...` for business, `/verify/...` for customers, otherwise public pages. `react-router-dom` (BrowserRouter) supplies the current path and links; there are no per-route components in a config file, `App.tsx` switches on the path itself. Static hosting needs a rewrite of every path to `index.html` so deep links work.
 - **State.** One React state store holds invoices, refunds and the audit log, seeded from `buildSeed()`. Signed-in user is plain React state. Refreshing the page resets everything, including the login.
 - **Auth.** `accounts` in `src/data.ts` holds demo emails and passwords in plain text, and the login form compares them in the browser. This is a stand-in, not security.
 - **Money.** Amounts are integers in pesewas (1 GHS = 100) and formatted for display.
