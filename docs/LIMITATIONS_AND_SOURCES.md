@@ -5,7 +5,7 @@
 - Not affiliated with, endorsed by or verified by the Ghana Revenue Authority. The GRA DEMO mark is a placeholder, not an official logo.
 - No backend. Data is generated in the browser and resets on refresh.
 - Logins and role checks are client-side and for demonstration only.
-- Tax is a single illustrative 10% rate. It is not Ghana's VAT structure.
+- Tax follows the 2026 Ghana rates GRA publishes (VAT 15%, NHIL 2.5%, GETFund 2.5% on the same base) by default, with an illustrative flat 10% option. Tax codes, exemptions, zero-rating and input credits are not modelled, and the rates were read from https://gra.gov.gh/domestic-tax/tax-types/vat/ on 4 October 2026 and may change.
 - Certification is simulated. No invoice is sent to any authority.
 - QR codes encode this app's own `/verify/<invoice id>` URL. The verify page says "Not verified by GRA". The QR code was rendered and checked visually. It has not been scanned with a physical phone camera.
 - A new invoice can be verified only while the page stays open.

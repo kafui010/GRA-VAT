@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Account, Audit, Invoice, Period, Refund, Role, accounts, companies, buildSeed, money, stamp, day, monthLabel, taxOf, fingerprint, refundedOf, shownStatus, totalsFor, FULL, ADMIN_BASE, BIZ_BASE, RATE, Line } from './data';
+import { Account, Audit, Invoice, Period, Refund, Role, accounts, companies, buildSeed, money, stamp, day, monthLabel, taxOf, taxFor, taxParts, modeOf, RATE_MODES, RateMode, fingerprint, refundedOf, shownStatus, totalsFor, FULL, ADMIN_BASE, BIZ_BASE, Line } from './data';
 import { Icon, QR, Badge, Stat, Card, PageHead, Bars } from './ui';
 import './style.css';
 
@@ -75,7 +75,7 @@ export function App() {
         <main className="main"><Boundary>{page}</Boundary></main>
         <footer className="foot"><div className="foot-in">
           <div><b>Mabbin GRA</b><p>Front-end demo of an E-VAT invoice platform. All data is made up.</p></div>
-          <div><b>Not official</b><p>Not affiliated with, endorsed by or verified by the Ghana Revenue Authority. Tax rate is an illustrative {RATE}%.</p></div>
+          <div><b>Not official</b><p>Not affiliated with, endorsed by or verified by the Ghana Revenue Authority. Tax figures follow the published 2026 Ghana rates by default (VAT 15% + NHIL 2.5% + GETFund 2.5%) or an illustrative demo 10%, and are not a tax filing.</p></div>
           <div><b>Demo only</b><p>Logins and sessions are simulated in the browser. Do not enter real credentials.</p></div>
         </div></footer>
       </div>
@@ -199,9 +199,9 @@ function Dashboard() {
       <PageHead title={admin ? 'National overview' : `${cname(user.companyId!)} dashboard`} icon="dashboard" sub={admin ? 'Every registered company in one view.' : `Signed in as ${user.role}. Figures use certified invoices in the chosen period.`} right={<PeriodPicker value={p} onChange={setP} />} />
       <div className="grid g4">
         <Stat icon="receipt" label="Invoices certified" value={String(t.count)} sub={t.pending ? `${t.pending} pending` : 'none pending'} />
-        <Stat icon="wallet" label="Total sales" value={money(t.sales)} sub={`VAT in sales ${money(t.vat)}`} />
+        <Stat icon="wallet" label="Total sales" value={money(t.sales)} sub={`Tax in sales ${money(t.vat)}`} />
         <Stat icon="undo" label="Total refunded" value={money(t.refunded)} sub={`${t.refundCount} credit note${t.refundCount === 1 ? '' : 's'}`} tone="info" />
-        <Stat icon="trend" label={admin ? 'Total to be paid (VAT)' : 'VAT to be paid'} value={money(t.payable)} sub="VAT collected minus VAT on refunds" tone="good" />
+        <Stat icon="trend" label={admin ? 'Total tax to be paid' : 'Tax to be paid'} value={money(t.payable)} sub="Tax collected minus tax on refunds" tone="good" />
       </div>
       <div className="grid g2">
         <Card title={admin ? 'Companies in this period' : 'Cancelled and pending'} icon={admin ? 'building' : 'ban'}>
@@ -272,7 +272,7 @@ function InvoicePage({ id }: { id: string }) {
     if (!g || g <= 0) return setMsg('Enter a refund amount.'); if (g > left) return setMsg(`Refund cannot exceed ${money(left)} still refundable.`); if (!rreason.trim()) return setMsg('Add a refund reason.');
     const n = s.refunds.filter((f) => f.companyId === inv.companyId).length + 1;
     const cn = `CN-${companies.find((c) => c.id === inv.companyId)!.code}-${String(n).padStart(4, '0')}`;
-    s.addRefund({ id: cn, invoiceId: inv.id, companyId: inv.companyId, amount: g, tax: taxOf(g), reason: rreason.trim(), at: new Date().toISOString(), by: user.email }); s.log('Credit note issued', cn, inv.companyId); setAmt(''); setRreason(''); setMsg(`Credit note ${cn} issued. The original invoice stays unchanged.`);
+    s.addRefund({ id: cn, invoiceId: inv.id, companyId: inv.companyId, amount: g, tax: taxOf(g, modeOf(inv)), reason: rreason.trim(), at: new Date().toISOString(), by: user.email }); s.log('Credit note issued', cn, inv.companyId); setAmt(''); setRreason(''); setMsg(`Credit note ${cn} issued. The original invoice stays unchanged.`);
   };
   const flag = () => { s.patch(inv.id, (i) => ({ ...i, flagged: !i.flagged })); s.log(inv.flagged ? 'Flag removed' : 'Flagged for review', inv.id, inv.companyId); };
   const url = ROOT + '/verify/' + inv.id;
@@ -281,7 +281,7 @@ function InvoicePage({ id }: { id: string }) {
     <div className="wrap">
       <PageHead title={inv.id} icon="receipt" sub={`${cname(inv.companyId)} - order ${inv.order}`} right={<Badge s={shown} />} />
       <div className="grid g4">
-        <Stat icon="wallet" label="Invoice total" value={money(inv.total)} sub={`VAT ${money(inv.tax)}`} />
+        <Stat icon="wallet" label="Invoice total" value={money(inv.total)} sub={`Tax ${money(inv.tax)}`} />
         <Stat icon="undo" label="Refunded" value={money(done)} sub={`${money(left)} refundable`} tone="info" />
         <Stat icon="clock" label="Created" value={day(inv.createdAt)} sub={stamp(inv.createdAt).slice(11)} />
         <Stat icon="check" label="Certified" value={inv.certifiedAt ? day(inv.certifiedAt) : 'Not yet'} sub={inv.certifiedAt ? stamp(inv.certifiedAt).slice(11) : ''} tone="good" />
@@ -289,7 +289,7 @@ function InvoicePage({ id }: { id: string }) {
       <div className="grid g2">
         <Card title="Items" icon="receipt">
           <div className="tbl-wrap"><table className="tbl"><thead><tr><th>Item</th><th className="r">Qty</th><th className="r">Unit</th><th className="r">Amount</th></tr></thead><tbody>{inv.lines.map((l, k) => <tr key={k}><td data-l="Item">{l.name}</td><td className="r" data-l="Qty">{l.qty}</td><td className="r" data-l="Unit">{money(l.unit)}</td><td className="r" data-l="Amount">{money(l.qty * l.unit)}</td></tr>)}</tbody></table></div>
-          <dl className="kv"><dt>Customer</dt><dd>{inv.customer}</dd><dt>Net</dt><dd>{money(inv.net)}</dd><dt>Demo VAT ({RATE}%)</dt><dd>{money(inv.tax)}</dd><dt>Total</dt><dd><b>{money(inv.total)}</b></dd><dt>Created by</dt><dd>{inv.by}</dd>{inv.cancelReason && <><dt>Cancel reason</dt><dd>{inv.cancelReason}</dd></>}</dl>
+          <dl className="kv"><dt>Customer</dt><dd>{inv.customer}</dd><dt>Net</dt><dd>{money(inv.net)}</dd>{taxParts(inv.net, modeOf(inv)).map((p) => <React.Fragment key={p.name}><dt>{p.name} ({p.pct}%)</dt><dd>{money(p.amount)}</dd></React.Fragment>)}<dt>Total</dt><dd><b>{money(inv.total)}</b></dd><dt>Rates</dt><dd>{RATE_MODES[modeOf(inv)].short}</dd><dt>Created by</dt><dd>{inv.by}</dd>{inv.cancelReason && <><dt>Cancel reason</dt><dd>{inv.cancelReason}</dd></>}</dl>
         </Card>
         <Card title="Verification QR" icon="qr">
           <div className="qr-box"><QR url={url} /><div><p className="muted">Encodes the demo verification page for this invoice. It points at this app's own demo page, never a GRA address.</p><p className="mono">Demo fingerprint {fingerprint(inv.id + inv.total + (inv.certifiedAt || ''))}</p><Link className="btn ghost sm" to={'/verify/' + inv.id}>Open customer page<Icon name="arrow" size={16} /></Link></div></div>
@@ -327,7 +327,7 @@ function Companies() {
       <div className="grid g3">{list.map((c) => { const t = totalsFor(s.invoices.filter((i) => i.companyId === c.id), s.refunds, p); return (
         <Card key={c.id} title={c.name} icon="building" aside={<span className="tag">{c.sector}</span>}>
           <p className="mono">{c.tin}</p>
-          <dl className="kv"><dt>Invoices</dt><dd>{t.count}</dd><dt>Sales</dt><dd>{money(t.sales)}</dd><dt>Refunded</dt><dd>{money(t.refunded)}</dd><dt>Cancelled</dt><dd>{t.cancelledCount}</dd><dt>VAT to be paid</dt><dd><b>{money(t.payable)}</b></dd></dl>
+          <dl className="kv"><dt>Invoices</dt><dd>{t.count}</dd><dt>Sales</dt><dd>{money(t.sales)}</dd><dt>Refunded</dt><dd>{money(t.refunded)}</dd><dt>Cancelled</dt><dd>{t.cancelledCount}</dd><dt>Tax to be paid</dt><dd><b>{money(t.payable)}</b></dd></dl>
           <Link className="btn sm" to={`${s.base}/companies/${c.id}`}>Track company<Icon name="arrow" size={16} /></Link>
         </Card>); })}</div>
       {!list.length && <p className="muted pad">No company matches "{q}".</p>}
@@ -341,7 +341,7 @@ function monthRows(invoices: Invoice[], refunds: Refund[]) {
 function Breakdown({ invoices, refunds }: { invoices: Invoice[]; refunds: Refund[] }) {
   const rows = monthRows(invoices, refunds);
   return (
-    <div className="tbl-wrap"><table className="tbl"><thead><tr><th>Month</th><th className="r">Invoices</th><th className="r">Sales</th><th className="r">Refunded</th><th className="r">Cancelled</th><th className="r">VAT to be paid</th></tr></thead><tbody>{rows.map(({ m, t }) => <tr key={m}><td data-l="Month">{monthLabel(m)}</td><td className="r" data-l="Invoices">{t.count}</td><td className="r" data-l="Sales">{money(t.sales)}</td><td className="r" data-l="Refunded">{money(t.refunded)}</td><td className="r" data-l="Cancelled">{t.cancelledCount}</td><td className="r" data-l="VAT">{money(t.payable)}</td></tr>)}</tbody></table></div>
+    <div className="tbl-wrap"><table className="tbl"><thead><tr><th>Month</th><th className="r">Invoices</th><th className="r">Sales</th><th className="r">Refunded</th><th className="r">Cancelled</th><th className="r">Tax to be paid</th></tr></thead><tbody>{rows.map(({ m, t }) => <tr key={m}><td data-l="Month">{monthLabel(m)}</td><td className="r" data-l="Invoices">{t.count}</td><td className="r" data-l="Sales">{money(t.sales)}</td><td className="r" data-l="Refunded">{money(t.refunded)}</td><td className="r" data-l="Cancelled">{t.cancelledCount}</td><td className="r" data-l="Tax">{money(t.payable)}</td></tr>)}</tbody></table></div>
   );
 }
 
@@ -354,9 +354,9 @@ function CompanyPage({ id }: { id: string }) {
       <PageHead title={c.name} icon="building" sub={`${c.sector} - ${c.tin}`} right={<PeriodPicker value={p} onChange={setP} />} />
       <div className="grid g4">
         <Stat icon="receipt" label="Invoices certified" value={String(t.count)} sub={`${t.pending} pending`} />
-        <Stat icon="wallet" label="Total sales" value={money(t.sales)} sub={`VAT ${money(t.vat)}`} />
+        <Stat icon="wallet" label="Total sales" value={money(t.sales)} sub={`Tax ${money(t.vat)}`} />
         <Stat icon="undo" label="Refunded" value={money(t.refunded)} sub={`${t.refundCount} credit note${t.refundCount === 1 ? '' : 's'}`} tone="info" />
-        <Stat icon="trend" label="VAT to be paid" value={money(t.payable)} sub={`${t.cancelledCount} cancelled (${money(t.cancelledValue)})`} tone="good" />
+        <Stat icon="trend" label="Tax to be paid" value={money(t.payable)} sub={`${t.cancelledCount} cancelled (${money(t.cancelledValue)})`} tone="good" />
       </div>
       <Card title="Month by month" icon="chart"><Breakdown invoices={inv} refunds={rf} /></Card>
       <Card title={`Invoices for ${c.name}`} icon="receipt"><Invoices presetCo={id} hideCo /></Card>
@@ -375,7 +375,7 @@ function Exceptions() {
       <div className="seg"><button className={tab === 'refunds' ? 'on' : ''} onClick={() => setTab('refunds')}>Refunds ({rf.length})</button><button className={tab === 'cancelled' ? 'on' : ''} onClick={() => setTab('cancelled')}>Cancelled ({cancelled.length})</button></div>
       <label className="f"><span><Icon name="search" size={14} /> Search</span><input className="in" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Company, invoice or reason" /></label>
       {tab === 'refunds' ? (
-        <div className="tbl-wrap"><table className="tbl"><thead><tr><th>Credit note</th>{admin && <th>Company</th>}<th>Invoice</th><th>Issued (UTC)</th><th>Reason</th><th className="r">Refunded</th><th className="r">VAT reversed</th></tr></thead><tbody>{rf.slice(0, 60).map((r) => <tr key={r.id}><td data-l="Credit note"><b>{r.id}</b></td>{admin && <td data-l="Company">{cname(r.companyId)}</td>}<td data-l="Invoice"><Link className="link" to={`${s.base}/invoices/${r.invoiceId}`}>{r.invoiceId}</Link></td><td data-l="Issued">{stamp(r.at).slice(0, 19)}</td><td data-l="Reason">{r.reason}</td><td className="r" data-l="Refunded">{money(r.amount)}</td><td className="r" data-l="VAT">{money(r.tax)}</td></tr>)}</tbody></table></div>
+        <div className="tbl-wrap"><table className="tbl"><thead><tr><th>Credit note</th>{admin && <th>Company</th>}<th>Invoice</th><th>Issued (UTC)</th><th>Reason</th><th className="r">Refunded</th><th className="r">Tax reversed</th></tr></thead><tbody>{rf.slice(0, 60).map((r) => <tr key={r.id}><td data-l="Credit note"><b>{r.id}</b></td>{admin && <td data-l="Company">{cname(r.companyId)}</td>}<td data-l="Invoice"><Link className="link" to={`${s.base}/invoices/${r.invoiceId}`}>{r.invoiceId}</Link></td><td data-l="Issued">{stamp(r.at).slice(0, 19)}</td><td data-l="Reason">{r.reason}</td><td className="r" data-l="Refunded">{money(r.amount)}</td><td className="r" data-l="Tax">{money(r.tax)}</td></tr>)}</tbody></table></div>
       ) : (
         <div className="tbl-wrap"><table className="tbl"><thead><tr><th>Invoice</th>{admin && <th>Company</th>}<th>Cancelled (UTC)</th><th>Reason</th><th className="r">Value</th></tr></thead><tbody>{cancelled.slice(0, 60).map((i) => <tr key={i.id}><td data-l="Invoice"><Link className="link strong" to={`${s.base}/invoices/${i.id}`}>{i.id}</Link></td>{admin && <td data-l="Company">{cname(i.companyId)}</td>}<td data-l="Cancelled">{stamp(i.cancelledAt).slice(0, 19)}</td><td data-l="Reason">{i.cancelReason}</td><td className="r" data-l="Value">{money(i.total)}</td></tr>)}</tbody></table></div>
       )}
@@ -397,9 +397,9 @@ function Reports({ fixed }: { fixed?: string }) {
         <Stat icon="wallet" label="Total sales" value={money(t.sales)} sub={`${t.count} invoices`} />
         <Stat icon="undo" label="Total refunded" value={money(t.refunded)} sub={`${t.refundCount} credit note${t.refundCount === 1 ? '' : 's'}`} tone="info" />
         <Stat icon="ban" label="Cancelled" value={String(t.cancelledCount)} sub={money(t.cancelledValue)} tone="bad" />
-        <Stat icon="trend" label="Total to be paid (VAT)" value={money(t.payable)} sub={`${money(t.vat)} collected - ${money(t.vatBack)} reversed`} tone="good" />
+        <Stat icon="trend" label="Total tax to be paid" value={money(t.payable)} sub={`${money(t.vat)} collected - ${money(t.vatBack)} reversed`} tone="good" />
       </div>
-      <Card title="By company" icon="building"><div className="tbl-wrap"><table className="tbl"><thead><tr><th>Company</th><th className="r">Invoices</th><th className="r">Sales</th><th className="r">Refunded</th><th className="r">Net sales</th><th className="r">VAT to be paid</th></tr></thead><tbody>{per.map(({ c, t: x }) => <tr key={c.id}><td data-l="Company"><b>{c.name}</b></td><td className="r" data-l="Invoices">{x.count}</td><td className="r" data-l="Sales">{money(x.sales)}</td><td className="r" data-l="Refunded">{money(x.refunded)}</td><td className="r" data-l="Net">{money(x.net)}</td><td className="r" data-l="VAT"><b>{money(x.payable)}</b></td></tr>)}<tr className="sum"><td data-l="Company">Total</td><td className="r" data-l="Invoices">{t.count}</td><td className="r" data-l="Sales">{money(t.sales)}</td><td className="r" data-l="Refunded">{money(t.refunded)}</td><td className="r" data-l="Net">{money(t.net)}</td><td className="r" data-l="VAT">{money(t.payable)}</td></tr></tbody></table></div></Card>
+      <Card title="By company" icon="building"><div className="tbl-wrap"><table className="tbl"><thead><tr><th>Company</th><th className="r">Invoices</th><th className="r">Sales</th><th className="r">Refunded</th><th className="r">Net sales</th><th className="r">Tax to be paid</th></tr></thead><tbody>{per.map(({ c, t: x }) => <tr key={c.id}><td data-l="Company"><b>{c.name}</b></td><td className="r" data-l="Invoices">{x.count}</td><td className="r" data-l="Sales">{money(x.sales)}</td><td className="r" data-l="Refunded">{money(x.refunded)}</td><td className="r" data-l="Net">{money(x.net)}</td><td className="r" data-l="Tax"><b>{money(x.payable)}</b></td></tr>)}<tr className="sum"><td data-l="Company">Total</td><td className="r" data-l="Invoices">{t.count}</td><td className="r" data-l="Sales">{money(t.sales)}</td><td className="r" data-l="Refunded">{money(t.refunded)}</td><td className="r" data-l="Net">{money(t.net)}</td><td className="r" data-l="Tax">{money(t.payable)}</td></tr></tbody></table></div></Card>
       <Card title="Month by month" icon="calendar"><Breakdown invoices={inv} refunds={rf} /><Bars data={monthRows(inv, rf).map(({ m, t: x }) => ({ label: monthLabel(m), value: x.sales, sub: money(x.sales) }))} /></Card>
     </div>
   );
@@ -430,16 +430,16 @@ function Team() {
 
 function NewInvoice() {
   const s = useStore(); const { user, base } = s; const [cust, setCust] = useState('Walk-in customer');
-  const [lines, setLines] = useState<{ name: string; qty: string; unit: string }[]>([{ name: '', qty: '1', unit: '' }]); const [msg, setMsg] = useState(''); const [made, setMade] = useState<string | null>(null);
+  const [lines, setLines] = useState<{ name: string; qty: string; unit: string }[]>([{ name: '', qty: '1', unit: '' }]); const [msg, setMsg] = useState(''); const [made, setMade] = useState<string | null>(null); const [mode, setMode] = useState<RateMode>('ghana');
   if (!user || !user.companyId) return null;
   const clean: Line[] = lines.map((l) => ({ name: l.name.trim(), qty: Math.max(0, Math.floor(+l.qty)), unit: Math.round(parseFloat(l.unit || '0') * 100) })).filter((l) => l.name && l.qty > 0 && l.unit > 0);
-  const net = clean.reduce((a, l) => a + l.qty * l.unit, 0); const tax = Math.round((net * RATE) / 100);
+  const net = clean.reduce((a, l) => a + l.qty * l.unit, 0); const tax = taxFor(net, mode);
   const upd = (k: number, f: Partial<{ name: string; qty: string; unit: string }>) => setLines((x) => x.map((l, i) => (i === k ? { ...l, ...f } : l)));
   const submit = () => {
     if (!clean.length) return setMsg('Add at least one item with a name, quantity and price.');
     const co = companies.find((c) => c.id === user.companyId)!; const n = s.invoices.filter((i) => i.companyId === co.id).length + 1;
     const id = `INV-${co.code}-${9000 + n}`;
-    s.addInvoice({ id, companyId: co.id, order: `ORD-${co.code}-${String(n + 100).padStart(4, '0')}`, customer: cust.trim() || 'Walk-in customer', lines: clean, net, tax, total: net + tax, status: 'Pending', createdAt: new Date().toISOString(), by: user.email });
+    s.addInvoice({ id, companyId: co.id, order: `ORD-${co.code}-${String(n + 100).padStart(4, '0')}`, customer: cust.trim() || 'Walk-in customer', mode, lines: clean, net, tax, total: net + tax, status: 'Pending', createdAt: new Date().toISOString(), by: user.email });
     s.log('Invoice reserved', id, co.id); setMade(id); setMsg(''); setLines([{ name: '', qty: '1', unit: '' }]);
   };
   return (
@@ -450,8 +450,10 @@ function NewInvoice() {
         <div className="form">
           <label className="f"><span>Customer</span><input className="in" value={cust} onChange={(e) => setCust(e.target.value)} /></label>
           {lines.map((l, k) => <div className="line" key={k}><label className="f grow"><span>Item</span><input className="in" value={l.name} onChange={(e) => upd(k, { name: e.target.value })} placeholder="Item name" /></label><label className="f sm"><span>Qty</span><input className="in" inputMode="numeric" value={l.qty} onChange={(e) => upd(k, { qty: e.target.value })} /></label><label className="f sm"><span>Unit (GHS)</span><input className="in" inputMode="decimal" value={l.unit} onChange={(e) => upd(k, { unit: e.target.value })} placeholder="0.00" /></label>{lines.length > 1 && <button className="btn ghost sm" type="button" onClick={() => setLines((x) => x.filter((_, i) => i !== k))}>Remove</button>}</div>)}
+          <label className="f"><span>Tax rates</span><select className="in" value={mode} onChange={(e) => setMode(e.target.value as RateMode)}>{(Object.keys(RATE_MODES) as RateMode[]).map((m) => <option key={m} value={m}>{RATE_MODES[m].label}</option>)}</select></label>
           <div className="row"><button className="btn ghost sm" type="button" onClick={() => setLines((x) => [...x, { name: '', qty: '1', unit: '' }])}><Icon name="plus" size={16} />Add item</button></div>
-          <dl className="kv"><dt>Net</dt><dd>{money(net)}</dd><dt>Demo VAT ({RATE}%)</dt><dd>{money(tax)}</dd><dt>Total</dt><dd><b>{money(net + tax)}</b></dd></dl>
+          <dl className="kv"><dt>Net</dt><dd>{money(net)}</dd>{taxParts(net, mode).map((p) => <React.Fragment key={p.name}><dt>{p.name} ({p.pct}%)</dt><dd>{money(p.amount)}</dd></React.Fragment>)}<dt>Total</dt><dd><b>{money(net + tax)}</b></dd></dl>
+          <p className="muted">{RATE_MODES[mode].note}</p>
           {msg && <p className="err" role="alert">{msg}</p>}
           <button className="btn" onClick={submit}>Reserve invoice</button>
         </div>
@@ -470,7 +472,7 @@ function Verify({ id }: { id: string }) {
         <div className="callout"><Icon name="info" size={18} /><span><b>Not verified by GRA.</b> This is a Mabbin GRA demo. It is not an official Ghana Revenue Authority certificate.</span></div>
         {!inv ? <Card title="No record found" icon="ban"><p className="muted">No invoice "{id}" exists in this demo session. New invoices only exist until you reload the page.</p><Link className="btn" to="/">Home</Link></Card> : (
           <Card title={inv.id} icon="receipt" aside={<Badge s={shownStatus(inv, refunds)} />}>
-            <dl className="kv"><dt>Company</dt><dd>{cname(inv.companyId)}</dd><dt>Total</dt><dd><b>{money(inv.total)}</b></dd><dt>Demo VAT</dt><dd>{money(inv.tax)}</dd><dt>Created</dt><dd>{stamp(inv.createdAt)}</dd><dt>Demo certified</dt><dd>{stamp(inv.certifiedAt)}</dd>{inv.cancelledAt && <><dt>Cancelled</dt><dd>{stamp(inv.cancelledAt)}</dd></>}{refundedOf(inv, refunds) > 0 && <><dt>Refunded</dt><dd>{money(refundedOf(inv, refunds))}</dd></>}</dl>
+            <dl className="kv"><dt>Company</dt><dd>{cname(inv.companyId)}</dd><dt>Net</dt><dd>{money(inv.net)}</dd>{taxParts(inv.net, modeOf(inv)).map((p) => <React.Fragment key={p.name}><dt>{p.name} ({p.pct}%)</dt><dd>{money(p.amount)}</dd></React.Fragment>)}<dt>Total</dt><dd><b>{money(inv.total)}</b></dd><dt>Rates</dt><dd>{RATE_MODES[modeOf(inv)].short}</dd><dt>Created</dt><dd>{stamp(inv.createdAt)}</dd><dt>Demo certified</dt><dd>{stamp(inv.certifiedAt)}</dd>{inv.cancelledAt && <><dt>Cancelled</dt><dd>{stamp(inv.cancelledAt)}</dd></>}{refundedOf(inv, refunds) > 0 && <><dt>Refunded</dt><dd>{money(refundedOf(inv, refunds))}</dd></>}</dl>
             <div className="qr-box"><QR url={ROOT + '/verify/' + inv.id} /><p className="muted">Demo QR. It opens this demo page on the same site. Demo invoices created in a session only exist until you reload.</p></div>
           </Card>)}
       </div>
