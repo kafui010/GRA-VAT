@@ -4,7 +4,7 @@ All of this runs in the browser with seeded data. Terms: *company* is a business
 
 ## Invoice life cycle
 
-1. **Reserve.** A cashier, manager or owner creates an invoice with a customer, items, quantities and unit prices. The app adds the demo tax (10%) and gives the invoice an ID such as like `INV-AK-0001`. Status: **Pending**.
+1. **Reserve.** A cashier, manager or owner creates an invoice with a customer, items, quantities and unit prices. The app adds tax (Ghana 2026 rates by default, or the demo 10% option) and gives the invoice an ID such as like `INV-AK-0001`. Status: **Pending**.
 2. **Certify (demo).** The invoice is marked **Certified** with a certification timestamp. In a real system this is where the tax authority would sign the invoice.
 3. **Cancel.** A pending invoice can be cancelled by cashier, manager or owner with a reason. A certified invoice that has no refunds can be cancelled by manager or owner. Status: **Cancelled**, with a cancel timestamp and reason. Cancelled invoices do not count as sales.
 4. **Refund.** Manager or owner issues a **credit note** against a certified invoice for a partial or full amount, with a reason. The original invoice is never edited. The app blocks refunds above the remaining refundable amount. Displayed status becomes **Part refunded** or **Refunded**.
@@ -39,6 +39,13 @@ The report page shows these per company and per month, and the monthly rows add 
 
 GRA Admin oversees everything read-only and can flag invoices. Owner and manager run the business side (manager has no team or audit pages). Cashier creates invoices and sees recent ones. Auditor reads. Details in [FEATURES_AND_ROLES.md](FEATURES_AND_ROLES.md).
 
-## Demo tax rule
+## Tax rules
 
-The demo uses a single illustrative 10% rate. Real VAT rules (several tax codes, levies, flat-rate schemes, inclusive or exclusive pricing) are not modelled. See the note on the earlier v7 reference in [LIMITATIONS_AND_SOURCES.md](LIMITATIONS_AND_SOURCES.md).
+Each invoice stores which rate set it uses. Tax is added on the net amount, and VAT, NHIL and GETFund are all charged on that same base, as the GRA page on the 2026 VAT reforms describes (Act 1151, effective 1 January 2026).
+
+| Rate set | Components | Example, net GHS 1,000 |
+|---|---|---|
+| Ghana 2026 rates (default) | VAT 15% + NHIL 2.5% + GETFund 2.5% (20% total) | tax 200, total 1,200 |
+| Demo 10% (option) | one flat 10% | tax 100, total 1,100 |
+
+Each component is rounded to the pessewa on its own. For refunds and credit notes the tax inside a refund amount is worked out from the invoice's own rate set (20/120 of the amount for Ghana rates, 10/110 for demo). The COVID-19 levy is not modelled because GRA says it was abolished. Source: https://gra.gov.gh/domestic-tax/tax-types/vat/. Not modelled: zero-rated or exempt supplies, the registration threshold, flat-rate schemes (abolished), input tax credits and tax codes. This is a simulator, not tax advice or a filing.
