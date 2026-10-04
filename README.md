@@ -48,13 +48,13 @@ Sign-in is held in memory only. A page reload logs you out and resets all data, 
 
 Real screenshots of the running demo (all data is made up). More in [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
 
-![GRA admin overview](docs/images/01-admin-overview.png)
+![GRA admin overview](docs/images/9-admin-overview.png)
 
-![Invoice with tax breakdown and QR](docs/images/03-admin-invoice-with-qr.png)
+![Invoice with tax breakdown and QR](docs/images/11-admin-invoice-with-qr.png)
 
-![Customer verify page](docs/images/07-customer-verify-page.png)
+![Customer verify page](docs/images/15-customer-verify-page.png)
 
-![Phone layout](docs/images/08-phone-business-dashboard.png)
+![Phone layout](docs/images/16-phone-business-dashboard.png)
 
 ## Security notes for a public repo
 
